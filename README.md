@@ -1,6 +1,6 @@
-# CI/CD Tools and Practices Final Project Template
+# CI/CD Tools and Practices Final Project
 
-This repository contains the template to be used for the Final Project for the Coursera course **CI/CD Tools and Practices**.
+This repository contains my Final Project for the Coursera course **CI/CD Tools and Practices**. It adds a CI pipeline with GitHub Actions (lint with flake8, unit tests with nose) and a CD pipeline with Tekton and OpenShift Pipelines (cleanup, git-clone, flake8, nose, buildah, deploy).
 
 ## Usage
 
