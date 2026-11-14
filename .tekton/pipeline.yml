@@ -1,0 +1,92 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: ci-cd-pipeline
+spec:
+  workspaces:
+    - name: output
+  params:
+    - name: GIT_REPO
+      type: string
+    - name: GIT_REF
+      type: string
+      default: main
+    - name: APP_NAME
+      type: string
+      default: cicd-app
+    - name: BUILD_IMAGE
+      type: string
+  tasks:
+    - name: cleanup
+      taskRef:
+        name: cleanup
+      workspaces:
+        - name: source
+          workspace: output
+
+    - name: git-clone
+      taskRef:
+        name: git-clone
+      params:
+        - name: url
+          value: $(params.GIT_REPO)
+        - name: revision
+          value: $(params.GIT_REF)
+      workspaces:
+        - name: output
+          workspace: output
+      runAfter:
+        - cleanup
+
+    - name: flake8
+      taskRef:
+        name: flake8
+      params:
+        - name: args
+          value: ["--count", "--max-complexity=10", "--max-line-length=127", "--statistics", "service"]
+      workspaces:
+        - name: source
+          workspace: output
+      runAfter:
+        - git-clone
+
+    - name: nose
+      taskRef:
+        name: nose
+      params:
+        - name: args
+          value: "-v --with-spec --spec-color"
+      workspaces:
+        - name: source
+          workspace: output
+      runAfter:
+        - flake8
+
+    - name: buildah
+      taskRef:
+        name: buildah
+        kind: ClusterTask
+      params:
+        - name: IMAGE
+          value: $(params.BUILD_IMAGE)
+      workspaces:
+        - name: source
+          workspace: output
+      runAfter:
+        - nose
+
+    - name: deploy
+      taskRef:
+        name: openshift-client
+        kind: ClusterTask
+      params:
+        - name: SCRIPT
+          value: |
+            oc create deployment $(params.APP_NAME) --image=$(params.BUILD_IMAGE) --dry-run=client -o yaml | oc apply -f -
+            oc rollout restart deployment/$(params.APP_NAME)
+            oc get pods -l app=$(params.APP_NAME)
+      workspaces:
+        - name: manifest-dir
+          workspace: output
+      runAfter:
+        - buildah
